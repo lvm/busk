@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+
+import re
+import argparse
+from pathlib import Path
+
+RE_DEFAULT = "(.*)"
+
+
+def walk_path(path: str) -> None:
+    Path2 = lambda path: Path(__file__).parent if path == "." else Path(path)
+    path = Path2(path)
+    for fd in path.glob("*"):
+        if fd.is_dir():
+            walk_path(fd)
+        yield fd
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("path", type=str, default="", help="path")
+    parser.add_argument(
+        "--no-files",
+        action="store_true",
+        default=False,
+        help="Find Files (default: True)",
+    )
+    parser.add_argument(
+        "--no-dirs",
+        action="store_true",
+        default=False,
+        help="Find Dirs (default: False).",
+    )
+    parser.add_argument(
+        "--regex",
+        type=str,
+        default=RE_DEFAULT,
+        help="String Regex. Default: %s" % RE_DEFAULT,
+    )
+    parser.add_argument(
+        "--iregex",
+        type=str,
+        default=RE_DEFAULT,
+        help="String Regex. Case Insensitive. Default: %s" % RE_DEFAULT,
+    )
+    parser.add_argument(
+        "--contains",
+        type=str,
+        default="",
+        help=(
+            "String(s) to search. If more than one word, "
+            " will search for the combination of these. Case sensitive.",
+        )
+    )
+    parser.add_argument(
+        "--icontains",
+        type=str,
+        default="",
+        help=(
+            "String(s) to search. If more than one word, "
+            "will search for the combination of these. Case Insensitive.",
+        )
+    )
+    parser.add_argument(
+        "--equal",
+        type=str,
+        default="",
+        help="String(s) to search. Will search this exact match. Case Sensitive.",
+    )
+    parser.add_argument(
+        "--iequal",
+        type=str,
+        default="",
+        help="String(s) to search. Will search this exact match. Case Insensitive.",
+    )
+
+    args = parser.parse_args()
+    if args.path:
+        for f in walk_path(args.path):
+            if args.no_files and f.is_file():
+                continue
+
+            if args.no_dirs and f.is_dir():
+                continue
+
+            if args.contains and not any(
+                [w for w in args.contains.split(" ") if w in f.name]
+            ):
+                continue
+
+            if args.icontains and not any(
+                [w for w in args.contains.lower().split(" ") if w in f.name.lower()]
+            ):
+                continue
+
+            if args.equal and not args.equal == f.name:
+                continue
+
+            if args.iequal and not args.iequal.lower() == f.name.lower():
+                continue
+
+            if args.regex and not re.match(args.regex, f.name):
+                continue
+
+            if args.iregex and not re.match(args.iregex, f.name, re.IGNORECASE):
+                continue
+
+            print(f.name)
