@@ -2,14 +2,18 @@
 
 import re
 import argparse
+from os import getcwd
 from pathlib import Path
 
 RE_DEFAULT = "(.*)"
 
 
+def cwd() -> Path:
+    return Path(getcwd())
+
+
 def walk_path(path: str) -> None:
-    Path2 = lambda path: Path(__file__).parent if path == "." else Path(path)
-    path = Path2(path)
+    path = cwd() if path == "." else Path(path)
     for fd in path.glob("*"):
         if fd.is_dir():
             walk_path(fd)
@@ -32,6 +36,12 @@ if __name__ == "__main__":
         help="Find Dirs (default: False).",
     )
     parser.add_argument(
+        "--just-names",
+        action="store_true",
+        default=False,
+        help="Just names and not absolute path (default: False).",
+    )
+    parser.add_argument(
         "--regex",
         type=str,
         default=RE_DEFAULT,
@@ -50,7 +60,7 @@ if __name__ == "__main__":
         help=(
             "String(s) to search. If more than one word, "
             " will search for the combination of these. Case sensitive.",
-        )
+        ),
     )
     parser.add_argument(
         "--icontains",
@@ -59,7 +69,7 @@ if __name__ == "__main__":
         help=(
             "String(s) to search. If more than one word, "
             "will search for the combination of these. Case Insensitive.",
-        )
+        ),
     )
     parser.add_argument(
         "--equal",
@@ -89,7 +99,7 @@ if __name__ == "__main__":
                 continue
 
             if args.icontains and not any(
-                [w for w in args.contains.lower().split(" ") if w in f.name.lower()]
+                [w for w in args.icontains.lower().split(" ") if w in f.name.lower()]
             ):
                 continue
 
@@ -105,4 +115,4 @@ if __name__ == "__main__":
             if args.iregex and not re.match(args.iregex, f.name, re.IGNORECASE):
                 continue
 
-            print(f.name)
+            print(f.name if args.just_names else f.absolute())
