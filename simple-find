@@ -1,20 +1,32 @@
 #!/usr/bin/env python3
 
 import re
+import shutil
 import argparse
-from os import getcwd
 from pathlib import Path
 
 RE_DEFAULT = "(.*)"
 
 
-def cwd() -> Path:
-    return Path(getcwd())
+def Path2(path:str) -> Path:
+    return Path().cwd() if path == "." else Path(path)
+
+
+def copy_to(src: Path, dst: Path) -> None:
+    shutil.copy(src, dst)
+
+
+def move_to(src: Path, dst: Path) -> None:
+    if Path2(src).is_dir() and Path2(dst).is_dir():
+        _dst = Path2(dst) / src.name
+        _dst.mkdir(parents=True, exist_ok=True)
+        dst = _dst
+    src.rename(dst)
 
 
 def walk_path(path: str) -> None:
-    path = cwd() if path == "." else Path(path)
-    for fd in path.glob("*"):
+    path = Path2(path)
+    for fd in path.glob("**/*"):
         if fd.is_dir():
             walk_path(fd)
         yield fd
@@ -83,6 +95,18 @@ if __name__ == "__main__":
         default="",
         help="String(s) to search. Will search this exact match. Case Insensitive.",
     )
+    parser.add_argument(
+        "--copy-to",
+        type=str,
+        default="",
+        help="Copy file(s) to DEST.",
+    )
+    parser.add_argument(
+        "--move-to",
+        type=str,
+        default="",
+        help="Move file(s) to DEST.",
+    )
 
     args = parser.parse_args()
     if args.path:
@@ -115,4 +139,12 @@ if __name__ == "__main__":
             if args.iregex and not re.match(args.iregex, f.name, re.IGNORECASE):
                 continue
 
+            if not f.exists():
+                continue
+
             print(f.name if args.just_names else f.absolute())
+            if args.copy_to and Path2(args.copy_to).parent.exists():
+                copy_to(f, args.copy_to)
+
+            if args.move_to and Path2(args.move_to).parent.exists():
+                move_to(f, args.move_to)
