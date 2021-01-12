@@ -8,7 +8,23 @@ from pathlib import Path
 RE_DEFAULT = "(.*)"
 
 
-def Path2(path:str) -> Path:
+def _replace(a, b, c):
+    return re.sub(a, b, c, flags=re.IGNORECASE)
+
+
+def _Paths(*pargs: list) -> list:
+    return [p if isinstance(p, Path) else Path2(p) for p in pargs]
+
+
+def _find_this(*fargs):
+    f = [_ for _ in fargs if _ and _ != RE_DEFAULT]
+    if f:
+        return f[0]
+    else:
+        return None
+
+
+def Path2(path: str) -> Path:
     return Path().cwd() if path == "." else Path(path)
 
 
@@ -17,11 +33,23 @@ def copy_to(src: Path, dst: Path) -> None:
 
 
 def move_to(src: Path, dst: Path) -> None:
-    if Path2(src).is_dir() and Path2(dst).is_dir():
+    src, dst = _Paths(src, dst)
+
+    if src.is_dir() and dst.is_dir():
         _dst = Path2(dst) / src.name
         _dst.mkdir(parents=True, exist_ok=True)
         dst = _dst
+    else:
+        _src = Path(src)
+        dst = dst / _src.name
+
     src.rename(dst)
+
+
+def rename_to(pattern: str, repl: str, path: Path) -> None:
+    path = Path2(path)
+    path_dst = _replace(pattern, repl, str(path.absolute()))
+    path.rename(path_dst)
 
 
 def walk_path(path: str) -> None:
@@ -54,16 +82,28 @@ if __name__ == "__main__":
         help="Just names and not absolute path (default: False).",
     )
     parser.add_argument(
+        "--loose",
+        action="store_true",
+        default=False,
+        help="Loose keywords (ie: split keywords and match anything).",
+    )
+    parser.add_argument(
+        "--ignore",
+        type=str,
+        default="",
+        help="String(s) to ignore in results. Case Sensitive.",
+    )
+    parser.add_argument(
         "--regex",
         type=str,
         default=RE_DEFAULT,
-        help="String Regex. Default: %s" % RE_DEFAULT,
+        help=f"String Regex. Default: {RE_DEFAULT!r}",
     )
     parser.add_argument(
         "--iregex",
         type=str,
         default=RE_DEFAULT,
-        help="String Regex. Case Insensitive. Default: %s" % RE_DEFAULT,
+        help=f"String Regex. Default: {RE_DEFAULT!r}",
     )
     parser.add_argument(
         "--contains",
@@ -80,7 +120,7 @@ if __name__ == "__main__":
         default="",
         help=(
             "String(s) to search. If more than one word, "
-            "will search for the combination of these. Case Insensitive.",
+            "will search for the combination of these. Case Insensitive."
         ),
     )
     parser.add_argument(
@@ -96,16 +136,25 @@ if __name__ == "__main__":
         help="String(s) to search. Will search this exact match. Case Insensitive.",
     )
     parser.add_argument(
+        "-cp",
         "--copy-to",
         type=str,
         default="",
         help="Copy file(s) to DEST.",
     )
     parser.add_argument(
+        "-mv",
         "--move-to",
         type=str,
         default="",
         help="Move file(s) to DEST.",
+    )
+    parser.add_argument(
+        "-rn",
+        "--rename-to",
+        type=str,
+        default="",
+        help="Rename file(s) to DEST.",
     )
 
     args = parser.parse_args()
@@ -117,15 +166,26 @@ if __name__ == "__main__":
             if args.no_dirs and f.is_dir():
                 continue
 
-            if args.contains and not any(
-                [w for w in args.contains.split(" ") if w in f.name]
-            ):
-                continue
+            if args.loose:
+                if args.contains and not any(
+                    [w for w in args.contains.split(" ") if w in f.name]
+                ):
+                    continue
 
-            if args.icontains and not any(
-                [w for w in args.icontains.lower().split(" ") if w in f.name.lower()]
-            ):
-                continue
+                if args.icontains and not any(
+                    [
+                        w
+                        for w in args.icontains.lower().split(" ")
+                        if w in f.name.lower()
+                    ]
+                ):
+                    continue
+            else:
+                if args.contains and not args.contains in f.name:
+                    continue
+
+                if args.icontains and not args.icontains.lower() in f.name.lower():
+                    continue
 
             if args.equal and not args.equal == f.name:
                 continue
@@ -142,9 +202,23 @@ if __name__ == "__main__":
             if not f.exists():
                 continue
 
+            if args.ignore and args.ignore in str(f.absolute()):
+                continue
+
             print(f.name if args.just_names else f.absolute())
             if args.copy_to and Path2(args.copy_to).parent.exists():
                 copy_to(f, args.copy_to)
 
             if args.move_to and Path2(args.move_to).parent.exists():
                 move_to(f, args.move_to)
+
+            if args.rename_to and Path2(args.rename_to).parent.exists():
+                _find = _find_this(
+                    args.contains,
+                    args.icontains,
+                    args.equal,
+                    args.iequal,
+                    args.regex,
+                    args.iregex,
+                )
+                rename_to(_find, args.rename_to, f)
